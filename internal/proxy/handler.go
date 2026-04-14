@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -43,11 +44,18 @@ func NewHandler(engine *Engine) gin.HandlerFunc {
 		apiKeyID, _ := c.Get(middleware.CtxApiKeyID)
 		userID, _ := c.Get(middleware.CtxUserID)
 
-		p.ServeHTTP(c.Writer, c.Request)
+		originalPath := c.Request.URL.Path
+
+		timeout := time.Duration(upstream.TimeoutSeconds) * time.Second
+		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+		defer cancel()
+		req := c.Request.WithContext(ctx)
+
+		p.ServeHTTP(c.Writer, req)
 
 		apiKeyUint := toUint(apiKeyID)
 		userUint := toUint(userID)
-		log := BuildLogEntry(meta, c.Request, apiKeyUint, userUint, upstream.ID)
+		log := BuildLogEntry(meta, originalPath, req, apiKeyUint, userUint, upstream.ID)
 		engine.AfterProxy(log)
 	}
 }

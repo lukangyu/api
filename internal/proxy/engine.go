@@ -38,7 +38,7 @@ func (e *Engine) BuildProxy(upstream *model.Upstream, meta *MetaCarrier) (*httpu
 	if upstream == nil {
 		return nil, errors.New("upstream is nil")
 	}
-	director, err := BuildDirector(upstream)
+	director, err := BuildDirector(upstream, meta)
 	if err != nil {
 		return nil, err
 	}

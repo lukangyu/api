@@ -9,11 +9,12 @@ import (
 )
 
 type MetaCarrier struct {
-	StatusCode int
-	BodyBytes  int64
-	StartedAt  time.Time
-	EndedAt    time.Time
-	ErrorMsg   string
+	StatusCode   int
+	BodyBytes    int64
+	StartedAt    time.Time
+	EndedAt      time.Time
+	ErrorMsg     string
+	UpstreamPath string
 }
 
 func ModifyResponse(meta *MetaCarrier) func(*http.Response) error {
@@ -27,7 +28,7 @@ func ModifyResponse(meta *MetaCarrier) func(*http.Response) error {
 	}
 }
 
-func BuildLogEntry(meta *MetaCarrier, req *http.Request, apiKeyID, userID, upstreamID uint) *model.RequestLog {
+func BuildLogEntry(meta *MetaCarrier, originalPath string, req *http.Request, apiKeyID, userID, upstreamID uint) *model.RequestLog {
 	latency := int64(0)
 	if meta != nil && !meta.StartedAt.IsZero() && !meta.EndedAt.IsZero() {
 		latency = meta.EndedAt.Sub(meta.StartedAt).Milliseconds()
@@ -39,20 +40,22 @@ func BuildLogEntry(meta *MetaCarrier, req *http.Request, apiKeyID, userID, upstr
 	statusCode := 0
 	responseBytes := int64(0)
 	errorMsg := ""
+	upstreamPath := ""
 	if meta != nil {
 		statusCode = meta.StatusCode
 		if meta.BodyBytes > 0 {
 			responseBytes = meta.BodyBytes
 		}
 		errorMsg = meta.ErrorMsg
+		upstreamPath = meta.UpstreamPath
 	}
 	return &model.RequestLog{
 		ApiKeyID:      apiKeyID,
 		UserID:        userID,
 		UpstreamID:    upstreamID,
 		Method:        req.Method,
-		Path:          req.URL.Path,
-		UpstreamPath:  req.URL.Path,
+		Path:          originalPath,
+		UpstreamPath:  upstreamPath,
 		StatusCode:    statusCode,
 		RequestBytes:  requestBytes,
 		ResponseBytes: responseBytes,

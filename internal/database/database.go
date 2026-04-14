@@ -37,7 +37,6 @@ func Init(dbPath string) (*gorm.DB, error) {
 		&model.ApiKey{},
 		&model.Upstream{},
 		&model.RequestLog{},
-		&model.DailyStats{},
 	); err != nil {
 		return nil, fmt.Errorf("auto migrate: %w", err)
 	}

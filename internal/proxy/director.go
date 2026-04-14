@@ -9,7 +9,7 @@ import (
 	"api_zhuanfa/internal/model"
 )
 
-func BuildDirector(upstream *model.Upstream) (func(*http.Request), error) {
+func BuildDirector(upstream *model.Upstream, meta *MetaCarrier) (func(*http.Request), error) {
 	target, err := url.Parse(upstream.BaseURL)
 	if err != nil {
 		return nil, err
@@ -33,6 +33,10 @@ func BuildDirector(upstream *model.Upstream) (func(*http.Request), error) {
 			}
 		}
 		req.URL.Path = singleJoiningSlash(basePath, path)
+
+		if meta != nil {
+			meta.UpstreamPath = req.URL.Path
+		}
 
 		applyUpstreamAuth(req, upstream)
 		applyExtraHeaders(req, upstream.ExtraHeaders)

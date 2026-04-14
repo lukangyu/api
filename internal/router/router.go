@@ -12,6 +12,7 @@ import (
 	"api_zhuanfa/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
 	"gorm.io/gorm"
 )
 
@@ -68,7 +69,7 @@ func New(cfg config.Config, db *gorm.DB, svc Services) *gin.Engine {
 	}
 
 	apiKeyAuth := middleware.NewApiKeyAuth(svc.ApiKeySvc)
-	rateLimiter := middleware.NewRateLimiter(20, 40)
+	rateLimiter := middleware.NewRateLimiter(rate.Limit(cfg.RateLimitRate), cfg.RateLimitBurst)
 	proxyGroup := r.Group("/proxy/:api_name")
 	proxyGroup.Use(apiKeyAuth.Middleware(), rateLimiter.Middleware())
 	{

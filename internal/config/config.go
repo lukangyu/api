@@ -16,6 +16,9 @@ type Config struct {
 	UpstreamCacheTTL int
 	LoggerBufferSize int
 	LoggerFlushSize  int
+
+	RateLimitRate  float64
+	RateLimitBurst int
 }
 
 func Load() Config {
@@ -30,6 +33,9 @@ func Load() Config {
 		UpstreamCacheTTL: getEnvInt("UPSTREAM_CACHE_TTL_SECONDS", 30),
 		LoggerBufferSize: getEnvInt("LOGGER_BUFFER_SIZE", 1000),
 		LoggerFlushSize:  getEnvInt("LOGGER_FLUSH_SIZE", 100),
+
+		RateLimitRate:  getEnvFloat("RATE_LIMIT_RATE", 20),
+		RateLimitBurst: getEnvInt("RATE_LIMIT_BURST", 40),
 	}
 }
 
@@ -51,4 +57,16 @@ func getEnvInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	return n
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultValue
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return f
 }

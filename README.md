@@ -3,7 +3,7 @@
 这是一个公司内部 API 中转网关，支持：
 
 - LLM API（OpenAI / Claude / Gemini）
-- 第三方 API（Google / YouTube 等）
+- 第三方 API（Google / YouTube / Product Hunt 等）
 - 任意 HTTP API（通过上游配置新增）
 
 并提供：
@@ -100,6 +100,8 @@ docker compose up -d --build
 ```text
 /proxy/openai/v1/chat/completions
 /proxy/youtube/youtube/v3/search
+/proxy/producthunt/v2/api/graphql
+/proxy/doubao_embedding/api/v3/embeddings/multimodal
 ```
 
 请求头必须带员工 API Key：
@@ -107,6 +109,81 @@ docker compose up -d --build
 ```text
 Authorization: Bearer sk-xxxx
 ```
+
+---
+
+## Product Hunt / Google / 豆包接入
+
+### 1) Product Hunt GraphQL
+
+- API 端点：`https://api.producthunt.com/v2/api/graphql`
+- 鉴权：`Authorization: Bearer <token>`
+
+在 `.env` 填写：
+
+```bash
+PRODUCT_HUNT_TOKEN=ph_xxx
+```
+
+重启服务后会自动生成 `producthunt` 上游。
+
+调用示例：
+
+```bash
+curl http://localhost:8081/proxy/producthunt/v2/api/graphql \
+  -H "Authorization: Bearer sk-你的员工key" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"query { __typename }"}'
+```
+
+### 2) Google API Key（含 YouTube）
+
+在 `.env` 填写：
+
+```bash
+GOOGLE_API_KEY=AIza...
+```
+
+重启后自动生成 `google` 上游（query `key=`）。
+
+调用示例（YouTube）：
+
+```bash
+curl "http://localhost:8081/proxy/google/youtube/v3/search?part=snippet&q=ai&type=video" \
+  -H "Authorization: Bearer sk-你的员工key"
+```
+
+### 3) 豆包 Embedding
+
+在 `.env` 配置：
+
+```bash
+DOUBAO_EMBEDDING_API_BASE=https://ark.cn-beijing.volces.com
+DOUBAO_EMBEDDING_DIMENSIONS=2048
+```
+
+重启后自动生成 `doubao_embedding` 上游。
+
+调用示例：
+
+```bash
+curl http://localhost:8081/proxy/doubao_embedding/api/v3/embeddings/multimodal \
+  -H "Authorization: Bearer sk-你的员工key" \
+  -H "Content-Type: application/json" \
+  -d '{"input":["hello"],"dimensions":2048}'
+```
+
+> `DOUBAO_EMBEDDING_DIMENSIONS` 是推荐值，实际请求中你仍可显式传 `dimensions`。
+
+---
+
+## 前端上游创建“点 OK 没反应”修复
+
+已修复：
+
+- 创建/更新/删除增加错误提示（会显示后端返回 error）
+- 增加 loading 与提交状态
+- 新增快捷模板按钮：Product Hunt / Google / 豆包 Embedding
 
 ---
 
@@ -131,6 +208,7 @@ Authorization: Bearer sk-xxxx
 - 管理端基础 CRUD（用户、上游、Key、日志、统计）
 - Docker 部署骨架
 - 前端管理台基础页面
+- Product Hunt / Google / 豆包接入预置
 
 后续可增强：
 
