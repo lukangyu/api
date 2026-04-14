@@ -1,0 +1,26 @@
+# 环境变量（包含密钥，禁止提交）
+.env
+
+# 数据目录（数据库文件等）
+data/
+
+# 前端依赖与构建产物
+web/node_modules/
+static/assets/
+
+# 后端构建产物
+bin/
+api-gateway
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# spec-workflow
+.spec-workflow/
