@@ -11,6 +11,7 @@ type Upstream = {
   auth_key: string
   auth_value: string
   timeout_seconds: number
+  proxy_url: string
   strip_prefix: boolean
   extra_headers: string
   is_active: boolean
@@ -236,6 +237,9 @@ export default function UpstreamsPage() {
           </Form.Item>
           <Form.Item label="timeout_seconds" name="timeout_seconds">
             <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="proxy_url" name="proxy_url">
+            <Input placeholder="需要代理时填写，例如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080" />
           </Form.Item>
           <Form.Item label="strip_prefix" name="strip_prefix" valuePropName="checked">
             <Switch />

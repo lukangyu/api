@@ -77,6 +77,12 @@ func (s *UpstreamService) Create(in *model.Upstream) error {
 	if in.TimeoutSeconds <= 0 {
 		in.TimeoutSeconds = 120
 	}
+	in.ProxyURL = strings.TrimSpace(in.ProxyURL)
+	if in.ProxyURL != "" {
+		if err := validateProxyURL(in.ProxyURL); err != nil {
+			return err
+		}
+	}
 	if in.ExtraHeaders == "" {
 		in.ExtraHeaders = "{}"
 	}
@@ -113,6 +119,22 @@ func validateAuthType(t string) error {
 	}
 }
 
+func validateProxyURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("proxy_url 格式无效: %v", err)
+	}
+	switch u.Scheme {
+	case "http", "https", "socks5", "socks5h":
+	default:
+		return errors.New("proxy_url 协议必须是 http、https、socks5 或 socks5h")
+	}
+	if u.Host == "" {
+		return errors.New("proxy_url 缺少主机名")
+	}
+	return nil
+}
+
 func validateExtraHeaders(raw string) error {
 	if strings.TrimSpace(raw) == "" || strings.TrimSpace(raw) == "{}" {
 		return nil
@@ -127,8 +149,8 @@ func validateExtraHeaders(raw string) error {
 var upstreamAllowedFields = map[string]bool{
 	"name": true, "display_name": true, "base_url": true,
 	"auth_type": true, "auth_key": true, "auth_value": true,
-	"timeout_seconds": true, "strip_prefix": true, "extra_headers": true,
-	"is_active": true, "description": true,
+	"timeout_seconds": true, "proxy_url": true, "strip_prefix": true,
+	"extra_headers": true, "is_active": true, "description": true,
 }
 
 func (s *UpstreamService) Update(id uint, raw map[string]interface{}) error {
@@ -192,6 +214,16 @@ func (s *UpstreamService) Update(id uint, raw map[string]interface{}) error {
 			}
 			if strings.TrimSpace(existing.AuthKey) == "" {
 				return fmt.Errorf("auth_type 为 %s 时 auth_key 不能为空", authType)
+			}
+		}
+	}
+
+	if v, ok := strVal(filtered, "proxy_url"); ok {
+		v = strings.TrimSpace(v)
+		filtered["proxy_url"] = v
+		if v != "" {
+			if err := validateProxyURL(v); err != nil {
+				return err
 			}
 		}
 	}

@@ -42,9 +42,13 @@ func (e *Engine) BuildProxy(upstream *model.Upstream, meta *MetaCarrier) (*httpu
 	if err != nil {
 		return nil, err
 	}
+	transport, err := e.pickTransport(upstream)
+	if err != nil {
+		return nil, err
+	}
 	p := &httputil.ReverseProxy{
 		Director:       director,
-		Transport:      e.transport,
+		Transport:      transport,
 		FlushInterval:  -1,
 		ModifyResponse: ModifyResponse(meta),
 		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, err error) {
@@ -57,6 +61,13 @@ func (e *Engine) BuildProxy(upstream *model.Upstream, meta *MetaCarrier) (*httpu
 		},
 	}
 	return p, nil
+}
+
+func (e *Engine) pickTransport(upstream *model.Upstream) (http.RoundTripper, error) {
+	if upstream.ProxyURL == "" {
+		return e.transport, nil
+	}
+	return NewTransportWithProxy(upstream.ProxyURL)
 }
 
 func (e *Engine) AfterProxy(log *model.RequestLog) {

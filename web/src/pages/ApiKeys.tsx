@@ -1,4 +1,4 @@
-import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from 'antd'
+import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 
@@ -107,7 +107,12 @@ export default function ApiKeysPage() {
       </Modal>
 
       <Modal open={!!plainKey} onCancel={() => setPlainKey('')} onOk={() => setPlainKey('')} title="请保存明文 Key（仅显示一次）">
-        <Input.TextArea value={plainKey} rows={3} readOnly />
+        <Typography.Paragraph
+          copyable={{ text: plainKey, tooltips: ['复制', '已复制'] }}
+          style={{ background: '#f5f5f5', padding: 12, borderRadius: 6, fontFamily: 'monospace', wordBreak: 'break-all' }}
+        >
+          {plainKey}
+        </Typography.Paragraph>
       </Modal>
     </>
   )

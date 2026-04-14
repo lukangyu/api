@@ -11,6 +11,7 @@ type Upstream struct {
 	AuthKey        string    `gorm:"size:128;not null;default:''" json:"auth_key"`
 	AuthValue      string    `gorm:"size:512;not null;default:''" json:"auth_value"`
 	TimeoutSeconds int       `gorm:"not null;default:120" json:"timeout_seconds"`
+	ProxyURL       string    `gorm:"size:512;not null;default:''" json:"proxy_url"`
 	StripPrefix    bool      `gorm:"not null;default:true" json:"strip_prefix"`
 	ExtraHeaders   string    `gorm:"type:text;not null;default:'{}'" json:"extra_headers"`
 	IsActive       bool      `gorm:"not null;default:true" json:"is_active"`

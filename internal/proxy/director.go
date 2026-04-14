@@ -38,6 +38,7 @@ func BuildDirector(upstream *model.Upstream, meta *MetaCarrier) (func(*http.Requ
 			meta.UpstreamPath = req.URL.Path
 		}
 
+		req.Header.Del("Authorization")
 		applyUpstreamAuth(req, upstream)
 		applyExtraHeaders(req, upstream.ExtraHeaders)
 
