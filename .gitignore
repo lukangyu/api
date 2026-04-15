@@ -11,6 +11,9 @@ static/assets/
 # 后端构建产物
 bin/
 api-gateway
+*.exe
+.gocache/
+.gomodcache/
 
 # 系统文件
 .DS_Store
