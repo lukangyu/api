@@ -30,6 +30,11 @@ func (s *ApiKeyService) Generate(userID uint, name string, requestLimit int64, e
 		return "", nil, err
 	}
 
+	normalized, err := NormalizeAllowedUpstreams(allowedUpstreams)
+	if err != nil {
+		return "", nil, err
+	}
+
 	entity := &model.ApiKey{
 		UserID:           userID,
 		KeyHash:          hash,
@@ -37,7 +42,7 @@ func (s *ApiKeyService) Generate(userID uint, name string, requestLimit int64, e
 		Name:             name,
 		RequestLimit:     requestLimit,
 		ExpiresAt:        expiresAt,
-		AllowedUpstreams: NormalizeAllowedUpstreams(allowedUpstreams),
+		AllowedUpstreams: normalized,
 		IsActive:         true,
 	}
 
@@ -85,7 +90,11 @@ func (s *ApiKeyService) Update(id uint, updates map[string]interface{}) error {
 		if !ok {
 			return errors.New("allowed_upstreams must be a string")
 		}
-		updates["allowed_upstreams"] = NormalizeAllowedUpstreams(v)
+		normalized, err := NormalizeAllowedUpstreams(v)
+		if err != nil {
+			return err
+		}
+		updates["allowed_upstreams"] = normalized
 	}
 	return s.db.Model(&model.ApiKey{}).Where("id = ?", id).Updates(updates).Error
 }
@@ -208,8 +217,16 @@ func JoinAllowedUpstreamIDs(ids []uint) string {
 	return strings.Join(out, ",")
 }
 
-func NormalizeAllowedUpstreams(raw string) string {
-	return JoinAllowedUpstreamIDs(ParseAllowedUpstreamIDs(raw))
+func NormalizeAllowedUpstreams(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
+	}
+	result := JoinAllowedUpstreamIDs(ParseAllowedUpstreamIDs(raw))
+	if result == "" {
+		return "", fmt.Errorf("allowed_upstreams 包含无效值: %q", trimmed)
+	}
+	return result, nil
 }
 
 func CoerceAllowedUpstreamIDs(raw interface{}) ([]uint, error) {

@@ -246,6 +246,13 @@ function buildClientAuthSummary(upstream: Partial<Upstream>): string {
 }
 
 function getGatewayOrigin(): string {
+  const configuredOrigin = (import.meta.env.VITE_GATEWAY_ORIGIN || '').trim().replace(/\/$/, '')
+  if (configuredOrigin) {
+    return configuredOrigin
+  }
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8080'
+  }
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin
   }

@@ -257,14 +257,14 @@ func applyUpstreamTestExtraHeaders(req *http.Request, raw string) {
 func classifyUpstreamTestResponse(statusCode int) (category string, ok bool, message string) {
 	switch {
 	case statusCode >= 200 && statusCode < 400:
-		return "success", true, "上游连通成功"
+		return "success", true, "连通成功"
 	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
-		return "auth_error", false, "上游已响应，但鉴权可能失败"
-	case statusCode == http.StatusMethodNotAllowed:
-		return "method_error", false, "上游已响应，但当前测试请求方法不匹配"
+		return "auth_error", true, "网络可达，但鉴权可能有误（请检查 auth_value）"
 	case statusCode == http.StatusNotFound:
-		return "path_error", false, "上游已响应，但 base_url 或路径可能不正确"
+		return "path_error", true, "网络可达（根路径返回 404 属正常，实际转发路径由调用方 URL 决定）"
+	case statusCode == http.StatusMethodNotAllowed:
+		return "method_error", true, "网络可达（根路径不支持 GET 属正常）"
 	default:
-		return "http_error", false, "上游已响应，但返回了非成功状态码"
+		return "http_error", true, "网络可达，上游返回了非常规状态码"
 	}
 }

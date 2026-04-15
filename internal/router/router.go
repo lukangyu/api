@@ -29,7 +29,7 @@ type Services struct {
 func New(cfg config.Config, db *gorm.DB, svc Services) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.CORS(cfg))
+	r.Use(middleware.CORS(cfg, svc.UpstreamSvc))
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
