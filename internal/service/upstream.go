@@ -157,7 +157,8 @@ func validateExtraHeaders(raw string) error {
 var upstreamAllowedFields = map[string]bool{
 	"name": true, "display_name": true, "base_url": true,
 	"auth_type": true, "auth_key": true, "auth_value": true,
-	"timeout_seconds": true, "proxy_url": true, "strip_prefix": true,
+	"allow_native_client_auth": true,
+	"timeout_seconds":          true, "proxy_url": true, "strip_prefix": true,
 	"extra_headers": true, "is_active": true, "description": true,
 }
 

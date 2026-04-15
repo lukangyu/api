@@ -69,7 +69,7 @@ func New(cfg config.Config, db *gorm.DB, svc Services) *gin.Engine {
 		admin.GET("/stats/daily", dashboardHandler.Daily)
 	}
 
-	apiKeyAuth := middleware.NewApiKeyAuth(svc.ApiKeySvc)
+	apiKeyAuth := middleware.NewApiKeyAuth(svc.ApiKeySvc, svc.UpstreamSvc)
 	rateLimiter := middleware.NewRateLimiter(rate.Limit(cfg.RateLimitRate), cfg.RateLimitBurst)
 	proxyGroup := r.Group("/proxy/:api_name")
 	proxyGroup.Use(apiKeyAuth.Middleware(), rateLimiter.Middleware())

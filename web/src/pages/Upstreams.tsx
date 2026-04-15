@@ -28,6 +28,7 @@ type Upstream = {
   auth_type: string
   auth_key: string
   auth_value: string
+  allow_native_client_auth: boolean
   timeout_seconds: number
   proxy_url: string
   strip_prefix: boolean
@@ -63,6 +64,7 @@ const defaultFormValues: Partial<Upstream> = {
   auth_type: 'none',
   auth_key: '',
   auth_value: '',
+  allow_native_client_auth: false,
   timeout_seconds: 120,
   proxy_url: '',
   strip_prefix: true,
@@ -231,17 +233,70 @@ function buildAuthSummary(upstream: Partial<Upstream>): string {
   return '未识别的鉴权方式。'
 }
 
-function buildCurlExample(upstream: Upstream): string {
+function buildClientAuthSummary(upstream: Partial<Upstream>): string {
+  if (upstream.allow_native_client_auth) {
+    if (upstream.auth_type === 'query') {
+      return `已开启原生兼容：调用方可通过 query 参数 ${upstream.auth_key || '(请填写 auth_key)'} 传员工 Key，Authorization: Bearer 也仍可使用。`
+    }
+    if (upstream.auth_type === 'header') {
+      return `已开启原生兼容：调用方可通过请求头 ${upstream.auth_key || '(请填写 auth_key)'} 传员工 Key，Authorization: Bearer 也仍可使用。`
+    }
+  }
+  return '默认：调用方使用 Authorization: Bearer sk-员工Key 访问网关。'
+}
+
+function getGatewayOrigin(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+  return 'http://localhost:8080'
+}
+
+function buildProxyTemplatePath(upstream: Pick<Upstream, 'name'>): string {
   const template = matchTemplate(upstream)
   const path = template?.requestPath || '/v1/chat/completions'
-  const method = template?.requestMethod || 'POST'
-  const proxyPath = `/proxy/${upstream.name}${path.startsWith('/') ? path : `/${path}`}`
+  return `/proxy/${upstream.name}${path.startsWith('/') ? path : `/${path}`}`
+}
 
-  const lines = [`curl http://localhost:8080${proxyPath} \\`]
+function stripQueryFromPath(path: string): string {
+  return path.split('?')[0]
+}
+
+function buildProxyRoutePrefix(upstream: Pick<Upstream, 'name'>): string {
+  return `/proxy/${upstream.name}/`
+}
+
+function buildProxyTemplateURL(upstream: Pick<Upstream, 'name'>, includeQuery = false): string {
+  const path = includeQuery ? buildProxyTemplatePath(upstream) : stripQueryFromPath(buildProxyTemplatePath(upstream))
+  return `${getGatewayOrigin()}${path}`
+}
+
+function buildClientExampleURL(upstream: Upstream): string {
+  const rawURL = buildProxyTemplateURL(upstream, true)
+  if (!(upstream.allow_native_client_auth && upstream.auth_type === 'query' && upstream.auth_key)) {
+    return rawURL
+  }
+
+  const url = new URL(rawURL)
+  url.searchParams.set(upstream.auth_key, 'sk-你的员工key')
+  return url.toString()
+}
+
+function buildCurlExample(upstream: Upstream): string {
+  const template = matchTemplate(upstream)
+  const method = template?.requestMethod || 'POST'
+  const fullURL = buildClientExampleURL(upstream)
+  const needsQuote = fullURL.includes('?') || fullURL.includes('&')
+  const lines = [`curl ${needsQuote ? `"${fullURL}"` : fullURL} \\`]
   if (method !== 'GET') {
     lines.push(`  -X ${method} \\`)
   }
-  lines.push('  -H "Authorization: Bearer sk-你的员工key" \\')
+
+  if (upstream.allow_native_client_auth && upstream.auth_type === 'header' && upstream.auth_key) {
+    lines.push(`  -H "${upstream.auth_key}: sk-你的员工key" \\`)
+  } else if (!(upstream.allow_native_client_auth && upstream.auth_type === 'query')) {
+    lines.push('  -H "Authorization: Bearer sk-你的员工key" \\')
+  }
 
   if (method === 'POST') {
     lines.push('  -H "Content-Type: application/json" \\')
@@ -278,11 +333,32 @@ export default function UpstreamsPage() {
   const authType = Form.useWatch('auth_type', form)
   const authKey = Form.useWatch('auth_key', form)
 
+  const exampleTemplate = useMemo(() => {
+    if (!exampleTarget) {
+      return null
+    }
+    return matchTemplate(exampleTarget)
+  }, [exampleTarget])
+
   const exampleText = useMemo(() => {
     if (!exampleTarget) {
       return ''
     }
     return buildCurlExample(exampleTarget)
+  }, [exampleTarget])
+
+  const exampleRoutePrefix = useMemo(() => {
+    if (!exampleTarget) {
+      return ''
+    }
+    return buildProxyRoutePrefix(exampleTarget)
+  }, [exampleTarget])
+
+  const exampleURL = useMemo(() => {
+    if (!exampleTarget) {
+      return ''
+    }
+    return buildProxyTemplateURL(exampleTarget)
   }, [exampleTarget])
 
   const load = async () => {
@@ -557,6 +633,22 @@ export default function UpstreamsPage() {
                 <Input.Password placeholder={getAuthValuePlaceholder(authType)} />
               </Form.Item>
             )}
+            {authType !== 'none' && (
+              <Form.Item
+                label="兼容调用方原生鉴权格式"
+                name="allow_native_client_auth"
+                valuePropName="checked"
+                extra={
+                  authType === 'query'
+                    ? `开启后，调用方也可通过 query 参数 ${authKey || '(请填写 auth_key)'} 传员工 Key。`
+                    : authType === 'header'
+                      ? `开启后，调用方也可通过请求头 ${authKey || '(请填写 auth_key)'} 传员工 Key。`
+                      : '开启与否都继续使用 Authorization: Bearer 员工 Key；此项主要对 query/header 上游有意义。'
+                }
+              >
+                <Switch />
+              </Form.Item>
+            )}
             <Form.Item label="description" name="description">
               <Input.TextArea rows={2} placeholder="记录用途、模型名、建议路径等，方便后续维护" />
             </Form.Item>
@@ -661,7 +753,30 @@ export default function UpstreamsPage() {
                 {
                   key: 'route',
                   label: '网关路径前缀',
-                  children: `/proxy/${exampleTarget.name}/...`
+                  children: (
+                    <Typography.Text copyable={{ text: exampleRoutePrefix }} style={{ wordBreak: 'break-all' }}>
+                      {exampleRoutePrefix}
+                    </Typography.Text>
+                  )
+                },
+                {
+                  key: 'url',
+                  label: '模板调用 URL',
+                  children: (
+                    <Typography.Text copyable={{ text: exampleURL }} style={{ wordBreak: 'break-all' }}>
+                      {exampleURL}
+                    </Typography.Text>
+                  )
+                },
+                {
+                  key: 'method',
+                  label: '模板请求方式',
+                  children: <Tag color="blue">{exampleTemplate?.requestMethod || 'POST'}</Tag>
+                },
+                {
+                  key: 'client-auth',
+                  label: '调用方鉴权',
+                  children: buildClientAuthSummary(exampleTarget)
                 },
                 {
                   key: 'auth',
@@ -695,7 +810,11 @@ export default function UpstreamsPage() {
               type="info"
               showIcon
               message="调用方只需要员工 Key"
-              description="示例里的 Authorization 是调用方访问网关使用的员工 Key。上游官方 API Key 已由网关按当前上游配置代为携带。"
+              description={
+                exampleTarget.allow_native_client_auth && (exampleTarget.auth_type === 'query' || exampleTarget.auth_type === 'header')
+                  ? '当前已开启原生兼容，调用方既可沿用原生 query/header 位置传员工 Key，也可继续使用 Authorization: Bearer。上游官方 API Key 仍由网关代为携带。'
+                  : '可优先把“模板调用 URL”发给调用方做联调；这里不带示例 query 参数，具体筛选条件可参考下方 curl。示例里的 Authorization 是调用方访问网关使用的员工 Key，上游官方 API Key 已由网关按当前上游配置代为携带。'
+              }
             />
           </Space>
         )}
