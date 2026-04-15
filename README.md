@@ -93,9 +93,11 @@ Authorization: Bearer sk-xxxx
 
 #### `none` — 不注入鉴权
 
-网关不做任何鉴权处理，由调用方在请求中自行携带鉴权信息。
+网关不会为上游额外注入鉴权信息。
 
-适用场景：上游本身不需要鉴权，或鉴权信息由调用方动态传入。
+注意：当前实现里，客户端传给网关的 `Authorization` 请求头用于员工 API Key 鉴权，转发前会被移除，不会原样透传给上游。
+
+适用场景：上游本身不需要鉴权，或鉴权通过其他非 `Authorization` 方式处理（例如固定 query 参数、固定自定义 header）。
 
 #### `bearer` — Bearer Token
 
@@ -196,8 +198,9 @@ curl http://localhost:8080/proxy/producthunt/v2/api/graphql \
 | name | `doubao_embedding` |
 | display_name | `Doubao Embedding` |
 | base_url | `https://ark.cn-beijing.volces.com` |
-| auth_type | `none` |
-| description | 调用方需自行在请求头中携带鉴权 |
+| auth_type | `bearer` |
+| auth_value | `你的 Ark API Key` |
+| description | 多模态向量化接口，建议沿用默认路径 `/api/v3/embeddings/multimodal` |
 
 调用：
 
@@ -205,7 +208,11 @@ curl http://localhost:8080/proxy/producthunt/v2/api/graphql \
 curl http://localhost:8080/proxy/doubao_embedding/api/v3/embeddings/multimodal \
   -H "Authorization: Bearer sk-你的员工key" \
   -H "Content-Type: application/json" \
-  -d '{"input":["hello"],"dimensions":2048}'
+  -d '{
+    "model":"doubao-embedding-vision-251215",
+    "input":[{"type":"text","text":"hello"}],
+    "dimensions":2048
+  }'
 ```
 
 ---

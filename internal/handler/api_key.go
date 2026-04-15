@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"api_zhuanfa/internal/model"
 	"api_zhuanfa/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -19,11 +20,12 @@ func NewAPIKeyHandler(apiKeySvc *service.ApiKeyService) *APIKeyHandler {
 
 func (h *APIKeyHandler) Create(c *gin.Context) {
 	var req struct {
-		UserID           uint    `json:"user_id"`
-		Name             string  `json:"name"`
-		RequestLimit     int64   `json:"request_limit"`
-		ExpiresAt        *string `json:"expires_at"`
-		AllowedUpstreams string  `json:"allowed_upstreams"`
+		UserID             uint    `json:"user_id"`
+		Name               string  `json:"name"`
+		RequestLimit       int64   `json:"request_limit"`
+		ExpiresAt          *string `json:"expires_at"`
+		AllowedUpstreams   string  `json:"allowed_upstreams"`
+		AllowedUpstreamIDs []uint  `json:"allowed_upstream_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -38,12 +40,16 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		}
 		expiresAt = &t
 	}
-	plain, item, err := h.apiKeySvc.Generate(req.UserID, req.Name, req.RequestLimit, expiresAt, req.AllowedUpstreams)
+	allowedUpstreams := req.AllowedUpstreams
+	if len(req.AllowedUpstreamIDs) > 0 {
+		allowedUpstreams = service.JoinAllowedUpstreamIDs(req.AllowedUpstreamIDs)
+	}
+	plain, item, err := h.apiKeySvc.Generate(req.UserID, req.Name, req.RequestLimit, expiresAt, allowedUpstreams)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"plain_key": plain, "item": item})
+	c.JSON(http.StatusOK, gin.H{"plain_key": plain, "item": toAPIKeyResponse(*item)})
 }
 
 func (h *APIKeyHandler) List(c *gin.Context) {
@@ -54,7 +60,11 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": rows, "total": total})
+	items := make([]apiKeyResponse, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, toAPIKeyResponse(row))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total})
 }
 
 func (h *APIKeyHandler) Update(c *gin.Context) {
@@ -73,6 +83,18 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+type apiKeyResponse struct {
+	model.ApiKey
+	AllowedUpstreamIDs []uint `json:"allowed_upstream_ids"`
+}
+
+func toAPIKeyResponse(item model.ApiKey) apiKeyResponse {
+	return apiKeyResponse{
+		ApiKey:             item,
+		AllowedUpstreamIDs: service.ParseAllowedUpstreamIDs(item.AllowedUpstreams),
+	}
 }
 
 func (h *APIKeyHandler) Delete(c *gin.Context) {

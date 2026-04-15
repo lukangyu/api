@@ -60,6 +60,7 @@ func New(cfg config.Config, db *gorm.DB, svc Services) *gin.Engine {
 
 		admin.GET("/upstreams", upstreamHandler.List)
 		admin.POST("/upstreams", upstreamHandler.Create)
+		admin.POST("/upstreams/test", upstreamHandler.Test)
 		admin.PUT("/upstreams/:id", upstreamHandler.Update)
 		admin.DELETE("/upstreams/:id", upstreamHandler.Delete)
 
