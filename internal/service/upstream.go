@@ -41,6 +41,17 @@ func (s *UpstreamService) List() ([]model.Upstream, error) {
 }
 
 func (s *UpstreamService) Create(in *model.Upstream) error {
+	if err := s.Prepare(in); err != nil {
+		return err
+	}
+	if err := s.db.Create(in).Error; err != nil {
+		return err
+	}
+	s.Invalidate()
+	return nil
+}
+
+func (s *UpstreamService) Prepare(in *model.Upstream) error {
 	if in == nil {
 		return errors.New("empty upstream")
 	}
@@ -49,6 +60,7 @@ func (s *UpstreamService) Create(in *model.Upstream) error {
 	in.BaseURL = strings.TrimSpace(in.BaseURL)
 	in.AuthType = strings.TrimSpace(in.AuthType)
 	in.AuthKey = strings.TrimSpace(in.AuthKey)
+	in.AuthValue = strings.TrimSpace(in.AuthValue)
 
 	if in.Name == "" {
 		return errors.New("name 不能为空")
@@ -89,10 +101,6 @@ func (s *UpstreamService) Create(in *model.Upstream) error {
 	if err := validateExtraHeaders(in.ExtraHeaders); err != nil {
 		return err
 	}
-	if err := s.db.Create(in).Error; err != nil {
-		return err
-	}
-	s.Invalidate()
 	return nil
 }
 
@@ -201,6 +209,12 @@ func (s *UpstreamService) Update(id uint, raw map[string]interface{}) error {
 			return err
 		}
 		filtered["auth_type"] = authType
+	}
+	if v, ok := strVal(filtered, "auth_key"); ok {
+		filtered["auth_key"] = strings.TrimSpace(v)
+	}
+	if v, ok := strVal(filtered, "auth_value"); ok {
+		filtered["auth_value"] = strings.TrimSpace(v)
 	}
 	if atOk && (authType == "header" || authType == "query") {
 		key := strings.TrimSpace(authKey)

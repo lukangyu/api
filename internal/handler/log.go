@@ -58,5 +58,97 @@ func (h *LogHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": rows, "total": total})
+	items, err := h.enrichLogRows(rows)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total})
+}
+
+type logResponse struct {
+	model.RequestLog
+	UserName     string `json:"user_name"`
+	APIKeyName   string `json:"api_key_name"`
+	UpstreamName string `json:"upstream_name"`
+}
+
+func (h *LogHandler) enrichLogRows(rows []model.RequestLog) ([]logResponse, error) {
+	userIDs := make([]uint, 0, len(rows))
+	apiKeyIDs := make([]uint, 0, len(rows))
+	upstreamIDs := make([]uint, 0, len(rows))
+	seenUsers := make(map[uint]struct{}, len(rows))
+	seenKeys := make(map[uint]struct{}, len(rows))
+	seenUpstreams := make(map[uint]struct{}, len(rows))
+
+	for _, row := range rows {
+		if _, ok := seenUsers[row.UserID]; !ok && row.UserID != 0 {
+			seenUsers[row.UserID] = struct{}{}
+			userIDs = append(userIDs, row.UserID)
+		}
+		if _, ok := seenKeys[row.ApiKeyID]; !ok && row.ApiKeyID != 0 {
+			seenKeys[row.ApiKeyID] = struct{}{}
+			apiKeyIDs = append(apiKeyIDs, row.ApiKeyID)
+		}
+		if _, ok := seenUpstreams[row.UpstreamID]; !ok && row.UpstreamID != 0 {
+			seenUpstreams[row.UpstreamID] = struct{}{}
+			upstreamIDs = append(upstreamIDs, row.UpstreamID)
+		}
+	}
+
+	userNames := make(map[uint]string, len(userIDs))
+	if len(userIDs) > 0 {
+		var users []model.User
+		if err := h.db.Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+			return nil, err
+		}
+		for _, user := range users {
+			if user.DisplayName != "" {
+				userNames[user.ID] = user.DisplayName
+				continue
+			}
+			userNames[user.ID] = user.Username
+		}
+	}
+
+	apiKeyNames := make(map[uint]string, len(apiKeyIDs))
+	if len(apiKeyIDs) > 0 {
+		var apiKeys []model.ApiKey
+		if err := h.db.Where("id IN ?", apiKeyIDs).Find(&apiKeys).Error; err != nil {
+			return nil, err
+		}
+		for _, apiKey := range apiKeys {
+			if apiKey.Name != "" {
+				apiKeyNames[apiKey.ID] = apiKey.Name
+				continue
+			}
+			apiKeyNames[apiKey.ID] = apiKey.KeyPrefix
+		}
+	}
+
+	upstreamNames := make(map[uint]string, len(upstreamIDs))
+	if len(upstreamIDs) > 0 {
+		var upstreams []model.Upstream
+		if err := h.db.Where("id IN ?", upstreamIDs).Find(&upstreams).Error; err != nil {
+			return nil, err
+		}
+		for _, upstream := range upstreams {
+			if upstream.DisplayName != "" {
+				upstreamNames[upstream.ID] = upstream.DisplayName
+				continue
+			}
+			upstreamNames[upstream.ID] = upstream.Name
+		}
+	}
+
+	items := make([]logResponse, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, logResponse{
+			RequestLog:   row,
+			UserName:     userNames[row.UserID],
+			APIKeyName:   apiKeyNames[row.ApiKeyID],
+			UpstreamName: upstreamNames[row.UpstreamID],
+		})
+	}
+	return items, nil
 }
